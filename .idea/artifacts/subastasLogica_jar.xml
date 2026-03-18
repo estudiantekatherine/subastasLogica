@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="subastasLogica:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/subastasLogica_jar</output-path>
+    <root id="archive" name="subastasLogica.jar">
+      <element id="module-output" name="subastasLogica" />
+    </root>
+  </artifact>
+</component>
