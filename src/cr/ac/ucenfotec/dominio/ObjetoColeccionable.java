@@ -73,7 +73,7 @@ public class ObjetoColeccionable {
     }
 
     /**
-     * Retorna la antigüedad del objeto en un formato legible para el usuario
+     * Retorna la antigüedad del objeto en un formato legible
      * Ejemplo: "3 año(s), 2 mes(es), 15 día(s)"
      *
      * @return Cadena de texto con la antigüedad desglosada en años, meses y días
@@ -175,5 +175,22 @@ public class ObjetoColeccionable {
              + ", fechaCompra=" + fechaDeCompra
              + ", antiguedad=" + getAntiguedadFormateada()
              + '}';
+    }
+
+    //Inclusión del metodo equals
+    /**
+     * Compara dos objetos coleccionables por su nombre
+     * Dos objetos coleccionables son iguales si tienen el mismo nombre
+     *
+     * @param objeto El objeto a comparar.
+     * @return true si tienen el mismo nombre, false en caso contrario.
+     */
+    @Override
+    public boolean equals(Object objeto) {
+        if (this == objeto) return true;
+        if (objeto == null) return false;
+        if (!(objeto instanceof ObjetoColeccionable)) return false;
+        ObjetoColeccionable otroObjeto = (ObjetoColeccionable) objeto;
+        return this.nombreObjeto.equalsIgnoreCase(otroObjeto.nombreObjeto);
     }
 }

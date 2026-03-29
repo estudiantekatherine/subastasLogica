@@ -14,7 +14,8 @@ import java.time.LocalDate;
 //Hereda de Usuario
 public class Moderador extends Usuario {
 
-    // ===================== CONSTRUCTORES =====================
+    //Solo hereda los atributos de usuario
+    //Constructores
 
     /**
      * Constructor por defecto.
@@ -46,6 +47,23 @@ public class Moderador extends Usuario {
      */
     @Override
     public String toString() {
+
         return "Moderador{" + super.toString() + "}";
     }
+
+    //Inclusión del metodo equals
+    /**
+     * Compara dos moderadores por su número de identificación.
+     *
+     * @param objeto El objeto a comparar.
+     * @return true si tienen la misma identificación, false en caso contrario.
+     */
+    @Override
+    public boolean equals(Object objeto) {
+        if (this == objeto) return true;
+        if (objeto == null) return false;
+        if (!(objeto instanceof Moderador)) return false; //moderador solo igual a moderador
+        return super.equals(objeto);
+    }
+
 }

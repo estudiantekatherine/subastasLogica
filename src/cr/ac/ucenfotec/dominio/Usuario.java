@@ -177,4 +177,20 @@ public abstract class Usuario {
              + ", edad=" + calcularEdad() + " año(s)"
              + ", correo='" + correoElectronico + '\'';
     }
+
+    //Inclusión del metodo equals
+    /**
+     * Compara dos usuarios por su número de identificación
+     *
+     * @param objeto El objeto a comparar.
+     * @return true si tienen la misma identificación, false en caso contrario.
+     */
+    @Override
+    public boolean equals(Object objeto) {
+        if (this == objeto) return true;
+        if (objeto == null) return false;
+        if (!(objeto instanceof Usuario)) return false;
+        Usuario otroUsuario = (Usuario) objeto;
+        return this.numeroIdentificacion.equals(otroUsuario.numeroIdentificacion);
+    }
 }

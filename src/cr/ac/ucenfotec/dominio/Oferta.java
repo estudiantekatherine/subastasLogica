@@ -51,7 +51,6 @@ public class Oferta {
     }
 
     //Getters y Setters
-
     /**
      * Obtiene el nombre del oferente
      *
@@ -139,5 +138,23 @@ public class Oferta {
              + ", puntuacion=" + puntuacionDelOferente
              + ", precioOfertado=$" + String.format("%.2f", precioOfertado)
              + '}';
+    }
+
+    //Inclusión del metodo equals
+    /**
+     * Compara dos ofertas por el nombre del oferente y el precio ofertado
+     * Dos ofertas son iguales si las realizó la misma persona por el mismo precio
+     *
+     * @param objeto El objeto a comparar
+     * @return true si tienen el mismo oferente y precio, false en caso contrario
+     */
+    @Override
+    public boolean equals(Object objeto) {
+        if (this == objeto) return true;
+        if (objeto == null) return false;
+        if (!(objeto instanceof Oferta)) return false;
+        Oferta otraOferta = (Oferta) objeto;
+        return this.nombreDelOferente.equals(otraOferta.nombreDelOferente)
+                && this.precioOfertado == otraOferta.precioOfertado;
     }
 }

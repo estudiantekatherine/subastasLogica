@@ -103,4 +103,19 @@ public class Vendedor extends Usuario {
              + ", direccion='" + direccionResidencia + '\''
              + "}";
     }
+
+    //Inclusión del metodo equals
+    /**
+     * Compara dos vendedores por su número de identificación.
+     *
+     * @param objeto El objeto a comparar.
+     * @return true si tienen la misma identificación, false en caso contrario.
+     */
+    @Override
+    public boolean equals(Object objeto) {
+        if (this == objeto) return true;
+        if (objeto == null) return false;
+        if (!(objeto instanceof Vendedor)) return false; //vendedor solo igual a vendedor
+        return super.equals(objeto);
+    }
 }

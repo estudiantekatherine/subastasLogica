@@ -16,7 +16,7 @@ import java.util.ArrayList;
  *
  * @version 1.0
  */
-public class ControladorPlataforma {
+public class Service {
 
     //Atributos
     /**
@@ -40,7 +40,7 @@ public class ControladorPlataforma {
     /**
      * Constructor por defecto.
      */
-    public ControladorPlataforma() {
+    public Service() {
         this.listaDeUsuarios  = new ArrayList<>();
         this.listaDeSubastas  = new ArrayList<>();
         this.listaDeOrdenes   = new ArrayList<>();
@@ -109,6 +109,10 @@ public class ControladorPlataforma {
     public String registrarVendedor(String nombreCompleto, String numeroIdentificacion,
                                     LocalDate fechaNacimiento, String contrasena,
                                     String correoElectronico, String direccionResidencia) {
+
+        if (existeUsuarioConIdentificacion(numeroIdentificacion)) {
+            return "Error: Ya existe un usuario con esa identificación registrado";
+        }
         Vendedor nuevoVendedor = new Vendedor(
                 nombreCompleto, numeroIdentificacion,
                 fechaNacimiento, contrasena, correoElectronico,
@@ -136,12 +140,16 @@ public class ControladorPlataforma {
     public String registrarColeccionista(String nombreCompleto, String numeroIdentificacion,
                                          LocalDate fechaNacimiento, String contrasena,
                                          String correoElectronico, String direccionResidencia) {
+
+        if (existeUsuarioConIdentificacion(numeroIdentificacion)) {
+            return "Error: Ya existe un usuario con esa identificación registrado.";
+        }
         Coleccionista nuevoColeccionista = new Coleccionista(
                 nombreCompleto, numeroIdentificacion,
                 fechaNacimiento, contrasena, correoElectronico,
                 0.0, direccionResidencia,
                 new ArrayList<>(), new ArrayList<>());
-        // Regla #7: debe ser mayor de edad
+        // Regla: debe ser mayor de edad
         if (!nuevoColeccionista.esMayorDeEdad()) {
             return "Error: El coleccionista debe ser mayor de edad (18 años o más).";
         }
@@ -150,7 +158,6 @@ public class ControladorPlataforma {
     }
 
     //Lista de usuarios
-
     /**
      * Retorna el listado de usuarios
      * Cada elemento de la lista contiene el número de orden y el toString del usuario
@@ -219,10 +226,19 @@ public class ControladorPlataforma {
         if (!(usuarioEncontrado instanceof Coleccionista)) {
             return "Error: No se encontró un coleccionista con esa identificación.";
         }
+
         Coleccionista coleccionista = (Coleccionista) usuarioEncontrado;
         String estadoFisico = convertirOpcionAEstadoObjeto(opcionEstadoFisico);
         ObjetoColeccionable nuevoObjeto = new ObjetoColeccionable(
                 nombreObjeto, descripcionDetallada, estadoFisico, fechaDeCompra);
+
+       // Validar que no exista un objeto con el mismo nombre en la colección
+        for (ObjetoColeccionable objeto : coleccionista.getColeccionDeObjetos()) {
+            if (objeto.equals(nuevoObjeto)) {
+                return "Error: Ya existe un objeto con ese nombre en la colección.";
+            }
+        }
+
         coleccionista.agregarObjetoAColeccion(nuevoObjeto);
         return "Objeto '" + nombreObjeto + "' agregado a la colección exitosamente.";
     }
@@ -300,6 +316,14 @@ public class ControladorPlataforma {
                 fechaDeVencimiento, creador,
                 precioMinimoDeAceptacion, objetosParaSubastar);
         listaDeSubastas.add(nuevaSubasta);
+
+        // Validar que no exista una subasta igual del mismo creador con la misma fecha
+        for (Subasta subasta : listaDeSubastas) {
+            if (subasta.equals(nuevaSubasta)) {
+                return "Error: Ya existe una subasta de este creador con la misma fecha de vencimiento.";
+            }
+        }
+
         return "Subasta creada exitosamente con " + objetosParaSubastar.size() + " objeto(s).";
     }
 
@@ -380,6 +404,14 @@ public class ControladorPlataforma {
         }
 
         Oferta nuevaOferta = new Oferta(coleccionistaOferente, precioOfertado);
+
+        // Validar que no exista una oferta igual del mismo coleccionista con el mismo precio
+        for (Oferta oferta : subastaSeleccionada.getOfertasRecibidas()) {
+            if (oferta.equals(nuevaOferta)) {
+                return "Error: Ya existe una oferta de este coleccionista con el mismo precio";
+            }
+        }
+
         subastaSeleccionada.agregarOferta(nuevaOferta);
         return "Oferta de ¢" + String.format("%.2f", precioOfertado) + " registrada exitosamente.";
     }
@@ -437,6 +469,21 @@ public class ControladorPlataforma {
     }
 
     /**
+     * Verifica si ya existe un usuario con la misma identificación en el sistema
+     *
+     * @param numeroIdentificacion Identificación a verificar
+     * @return true si ya existe, false si no existe
+     */
+    private boolean existeUsuarioConIdentificacion(String numeroIdentificacion) {
+        for (Usuario usuario : listaDeUsuarios) {
+            if (usuario.getNumeroIdentificacion().equals(numeroIdentificacion)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Busca un objeto en la colección de un coleccionista por su nombre (ignora mayúsculas/minúsculas).
      *
      * @param coleccionista Coleccionista propietario de los objetos.
@@ -451,6 +498,26 @@ public class ControladorPlataforma {
             }
         }
         return null;
+    }
+
+    //Inicio de sesión
+    /**
+     * Valida las credenciales de un usuario en el sistema
+     * Busca un usuario con el correo y contraseña
+     *
+     * @param correoElectronico Correo electrónico ingresado.
+     * @param contrasena        Contraseña ingresada.
+     * @return Mensaje indicando el resultado del inicio de sesión.
+     */
+    public String iniciarSesion(String correoElectronico, String contrasena) {
+        for (Usuario usuario : listaDeUsuarios) {
+            if (usuario.getCorreoElectronico().equals(correoElectronico)
+                    && usuario.getContrasena().equals(contrasena)) {
+                return "Bienvenido, " + usuario.getNombreCompleto()
+                        + ". Sesión iniciada correctamente.";
+            }
+        }
+        return "Error: Correo o contraseña incorrectos.";
     }
 
     //Getters y Setters
@@ -508,4 +575,6 @@ public class ControladorPlataforma {
     public void setListaDeOrdenes(ArrayList<OrdenAdjudicacion> listaDeOrdenes) {
         this.listaDeOrdenes = listaDeOrdenes;
     }
+
+
 }

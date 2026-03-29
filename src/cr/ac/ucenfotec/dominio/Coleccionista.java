@@ -177,4 +177,18 @@ public class Coleccionista extends Usuario {
              + ", cantidadObjetos=" + coleccionDeObjetos.size()
              + "}";
     }
+//Inclusión de metodo equals
+    /**
+     * Compara dos coleccionistas por su número de identificación.
+     *
+     * @param objeto El objeto a comparar.
+     * @return true si tienen la misma identificación, false en caso contrario.
+     */
+    @Override
+    public boolean equals(Object objeto) {
+        if (this == objeto) return true;
+        if (objeto == null) return false;
+        if (!(objeto instanceof Coleccionista)) return false; //coleccionista solo igual a coleccionista
+        return super.equals(objeto);
+    }
 }

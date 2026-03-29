@@ -99,7 +99,7 @@ public class Subasta {
     }
 
     /**
-     * Obtiene la puntuación de reputación del creador de la subasta.
+     * Obtiene la puntuación de reputación del creador de la subasta
      *
      * @return Puntuación del creador, o 0.0 si el creador no tiene puntuación.
      */
@@ -124,7 +124,8 @@ public class Subasta {
     }
 
     /**
-     * Retorna la oferta con el precio más alto entre todas las recibidas
+     * Retorna la oferta con el precio más alto entre todas las recibidas, si encuentra
+     * una mayor la reemplaza
      *
      * @return La oferta más alta, o null si no hay ofertas
      */
@@ -196,7 +197,6 @@ public class Subasta {
         this.ofertasRecibidas = ofertasRecibidas; }
 
     //ToString
-
     /**
      * Retorna una representación textual completa de la subasta
      *
@@ -216,5 +216,23 @@ public class Subasta {
              + ", objetos="        + objetosSubastados.size()
              + ", ofertas="        + ofertasRecibidas.size()
              + '}';
+    }
+
+    //Inclusión del metodo equals
+    /**
+     * Compara dos subastas por su creador y fecha de vencimiento
+     * Dos subastas son iguales si las creó la misma persona con la misma fecha de vencimiento
+     *
+     * @param objeto El objeto a comparar.
+     * @return true si tienen el mismo creador y fecha de vencimiento, false en caso contrario.
+     */
+    @Override
+    public boolean equals(Object objeto) {
+        if (this == objeto) return true;
+        if (objeto == null) return false;
+        if (!(objeto instanceof Subasta)) return false;
+        Subasta otraSubasta = (Subasta) objeto;
+        return this.creadorDeLaSubasta.equals(otraSubasta.creadorDeLaSubasta)
+                && this.fechaDeVencimiento.equals(otraSubasta.fechaDeVencimiento);
     }
 }

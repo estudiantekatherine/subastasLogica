@@ -6,7 +6,7 @@ import java.util.ArrayList;
 /**
  * Representa la orden de adjudicación generada cuando un coleccionista gana una subasta
  * La orden formaliza la aceptación de la adjudicación e incluye el detalle completo
- * de los objetos adjudicados y el precio total acordado.
+ * de los objetos adjudicados y el precio total acordado
  *
  * @version 1.0
  */
@@ -53,7 +53,6 @@ public class OrdenAdjudicacion {
     }
 
     //Getters y Setters
-
     /**
      * Obtiene el nombre completo del ganador de la subasta
      *
@@ -141,5 +140,23 @@ public class OrdenAdjudicacion {
              + ", cantidadObjetos=" + objetosAdjudicados.size()
              + ", precioTotal=¢" + String.format("%.2f", precioTotalDeLaOrden)
              + '}';
+    }
+
+    //Inclusión del metodo equals
+    /**
+     * Compara dos órdenes de adjudicación por el nombre del ganador y la fecha de la orden
+     * Dos órdenes son iguales si las ganó la misma persona en la misma fecha
+     *
+     * @param objeto El objeto a comparar.
+     * @return true si tienen el mismo ganador y fecha, false en caso contrario.
+     */
+    @Override
+    public boolean equals(Object objeto) {
+        if (this == objeto) return true;
+        if (objeto == null) return false;
+        if (!(objeto instanceof OrdenAdjudicacion)) return false;
+        OrdenAdjudicacion otraOrden = (OrdenAdjudicacion) objeto;
+        return this.nombreCompletoDelGanador.equals(otraOrden.nombreCompletoDelGanador)
+                && this.fechaDeLaOrden.equals(otraOrden.fechaDeLaOrden);
     }
 }
