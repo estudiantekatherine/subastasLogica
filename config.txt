@@ -1,0 +1,8 @@
+# Configuración de la Plataforma de Subastas
+# Este archivo es leído automáticamente al iniciar el sistema
+
+app.nombre=Plataforma Digital de Subastas Especializadas
+app.version=1.0
+app.persistencia=memoria
+app.moneda=CRC
+app.max.moderadores=1

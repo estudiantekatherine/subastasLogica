@@ -4,6 +4,9 @@ import cr.ac.ucenfotec.dominio.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 
 /**
  * Controlador principal de la plataforma de subastas
@@ -36,6 +39,12 @@ public class Service {
      */
     private ArrayList<OrdenAdjudicacion> listaDeOrdenes;
 
+    /**
+     * Lista de categorías temáticas disponibles en la plataforma.
+     * Las subastas se clasifican usando estas categorías.
+     */
+    private ArrayList<Categoria> listaDeCategorias;
+
     //Constructores
     /**
      * Constructor por defecto.
@@ -44,6 +53,8 @@ public class Service {
         this.listaDeUsuarios  = new ArrayList<>();
         this.listaDeSubastas  = new ArrayList<>();
         this.listaDeOrdenes   = new ArrayList<>();
+        this.listaDeCategorias = new ArrayList<>();
+        leerArchivoConfiguracion();
     }
 
     //Verificación inicial del sistema
@@ -81,6 +92,10 @@ public class Service {
         // Regla: solo puede existir un moderador
         if (existeModerador()) {
             return "Error: Ya existe un moderador registrado en la plataforma";
+        }
+        // validar identificación duplicada
+        if (existeUsuarioConIdentificacion(numeroIdentificacion)) {
+            return "Error: Ya existe un usuario con esa identificación.";
         }
         // Crear el moderador para validar su edad antes de registrarlo
         Moderador nuevoModerador = new Moderador(
@@ -262,48 +277,56 @@ public class Service {
 
     //Creación y enlista de subastas
     /**
-     * Crea una nueva subasta en la plataforma
-     * Para coleccionistas, valida que los objetos pertenezcan a su colección
-     * Para vendedores, crea objetos temporales con los nombres indicados
-     *
+     * Crea una nueva subasta en la plataforma aplicando todas las reglas de negocio.
+     * Asigna automáticamente un coleccionista moderador de forma aleatoria.
+     * Para coleccionistas, valida que los objetos pertenezcan a su colección.
+     * Para vendedores, crea objetos temporales con los nombres indicados.
      *
      * @param identificacionCreador    Identificación del usuario que crea la subasta.
      * @param precioMinimoDeAceptacion Precio mínimo requerido para las ofertas.
      * @param fechaDeVencimiento       Fecha y hora límite de la subasta.
      * @param nombresDeObjetos         Nombres de los objetos a incluir en la subasta.
+     * @param nombreCategoria          Nombre de la categoría de la subasta.
      * @return Mensaje de éxito o descripción del error encontrado.
      */
     public String crearSubasta(String identificacionCreador, double precioMinimoDeAceptacion,
-                                LocalDateTime fechaDeVencimiento,
-                                ArrayList<String> nombresDeObjetos) {
+                               LocalDateTime fechaDeVencimiento,
+                               ArrayList<String> nombresDeObjetos,
+                               String nombreCategoria) {
         Usuario creador = buscarUsuarioPorIdentificacion(identificacionCreador);
         if (creador == null) {
             return "Error: No se encontró ningún usuario con la identificación ingresada.";
         }
-        // Regla: el moderador no puede crear ni participar en subastas
+        // Regla #3: el moderador no puede crear subastas
         if (creador instanceof Moderador) {
             return "Error: El moderador no puede participar ni crear subastas.";
         }
-        // Regla: la subasta debe tener al menos un objeto
+        // Regla #6: la subasta debe tener al menos un objeto
         if (nombresDeObjetos == null || nombresDeObjetos.isEmpty()) {
             return "Error: No se puede crear una subasta sin objetos asociados.";
         }
 
+        // Buscar la categoría seleccionada
+        Categoria categoriaSeleccionada = buscarCategoriaPorNombre(nombreCategoria);
+        if (categoriaSeleccionada == null) {
+            return "Error: La categoría ingresada no existe en el sistema.";
+        }
+
         ArrayList<ObjetoColeccionable> objetosParaSubastar = new ArrayList<>();
 
-        if (creador instanceof Coleccionista coleccionista) {
-            // Regla: el coleccionista solo puede subastar objetos de su propia colección
+        if (creador instanceof Coleccionista) {
+            Coleccionista coleccionista = (Coleccionista) creador;
+            // Regla #9: el coleccionista solo puede subastar objetos de su colección
             for (String nombreObjeto : nombresDeObjetos) {
                 ObjetoColeccionable objetoEncontrado = buscarObjetoEnColeccion(
                         coleccionista, nombreObjeto);
                 if (objetoEncontrado == null) {
                     return "Error: El objeto '" + nombreObjeto
-                         + "' no existe en la colección del coleccionista.";
+                            + "' no existe en la colección del coleccionista.";
                 }
                 objetosParaSubastar.add(objetoEncontrado);
             }
         } else if (creador instanceof Vendedor) {
-            // El vendedor crea objetos directamente en la subasta con nombre e información básica
             for (String nombreObjeto : nombresDeObjetos) {
                 ObjetoColeccionable objetoDelVendedor = new ObjetoColeccionable(
                         nombreObjeto, "Objeto ofrecido por vendedor",
@@ -314,17 +337,39 @@ public class Service {
 
         Subasta nuevaSubasta = new Subasta(
                 fechaDeVencimiento, creador,
-                precioMinimoDeAceptacion, objetosParaSubastar);
-        listaDeSubastas.add(nuevaSubasta);
+                precioMinimoDeAceptacion, objetosParaSubastar,
+                categoriaSeleccionada);
 
-        // Validar que no exista una subasta igual del mismo creador con la misma fecha
-        for (Subasta subasta : listaDeSubastas) {
-            if (subasta.equals(nuevaSubasta)) {
+        // Validar ANTES de agregar que no exista una subasta igual
+        for (Subasta subastaExistente : listaDeSubastas) {
+            if (subastaExistente.equals(nuevaSubasta)) {
                 return "Error: Ya existe una subasta de este creador con la misma fecha de vencimiento.";
             }
         }
 
-        return "Subasta creada exitosamente con " + objetosParaSubastar.size() + " objeto(s).";
+        // Asignar moderador aleatorio de los coleccionistas que son moderadores
+        Coleccionista moderadorAleatorio = seleccionarModeradorAleatorio();
+        String mensajeCorreo = "";
+        if (moderadorAleatorio != null) {
+            nuevaSubasta.setModeradorAsignado(moderadorAleatorio);
+            // Simular envío de correo al moderador asignado
+            mensajeCorreo = simularEnvioCorreoModerador(
+                    moderadorAleatorio, creador.getNombreCompleto());
+        }
+
+        listaDeSubastas.add(nuevaSubasta);
+
+        if (moderadorAleatorio != null) {
+            return "Subasta creada exitosamente con " + objetosParaSubastar.size()
+                    + " objeto(s). Moderador asignado: "
+                    + moderadorAleatorio.getNombreCompleto()
+                    + ". " + mensajeCorreo;
+        } else {
+            return "Subasta creada exitosamente con " + objetosParaSubastar.size()
+                    + " objeto(s). Sin moderador asignado "
+                    + "(el moderador debe designar coleccionistas como moderadores).";
+        }
+
     }
 
     /**
@@ -452,6 +497,194 @@ public class Service {
         return totalOfertas;
     }
 
+    // ===================== GESTIÓN DE CATEGORÍAS =====================
+
+    /**
+     * Registra una nueva categoría en la plataforma.
+     * Valida que no exista otra categoría con el mismo nombre.
+     *
+     * @param nombreCategoria      Nombre de la nueva categoría.
+     * @param descripcionCategoria Descripción del tipo de objetos que agrupa.
+     * @return Mensaje de éxito o error.
+     */
+    public String agregarCategoria(String nombreCategoria, String descripcionCategoria) {
+        if (nombreCategoria == null || nombreCategoria.trim().isEmpty()) {
+            return "Error: El nombre de la categoría no puede estar vacío.";
+        }
+        Categoria nuevaCategoria = new Categoria(nombreCategoria, descripcionCategoria);
+        for (Categoria categoriaExistente : listaDeCategorias) {
+            if (categoriaExistente.equals(nuevaCategoria)) {
+                return "Error: Ya existe una categoría con ese nombre.";
+            }
+        }
+        listaDeCategorias.add(nuevaCategoria);
+        return "Categoría '" + nombreCategoria + "' registrada exitosamente.";
+    }
+
+    /**
+     * Retorna el listado de categorías formateado para su visualización.
+     *
+     * @return Lista de cadenas con la información de cada categoría.
+     */
+    public ArrayList<String> getListaCategoriasFormateada() {
+        ArrayList<String> categoriasFormateadas = new ArrayList<>();
+        for (int i = 0; i < listaDeCategorias.size(); i++) {
+            categoriasFormateadas.add((i + 1) + ". " + listaDeCategorias.get(i).toString());
+        }
+        return categoriasFormateadas;
+    }
+
+    /**
+     * Retorna los nombres de las categorías activas para mostrar en ComboBox.
+     *
+     * @return Lista de nombres de categorías activas.
+     */
+    public ArrayList<String> getNombresCategoriasActivas() {
+        ArrayList<String> nombresActivos = new ArrayList<>();
+        for (Categoria categoria : listaDeCategorias) {
+            if (categoria.isActiva()) {
+                nombresActivos.add(categoria.getNombreCategoria());
+            }
+        }
+        return nombresActivos;
+    }
+
+// ===================== GESTIÓN DE MODERADORES =====================
+
+    /**
+     * Selecciona a un coleccionista como moderador de la plataforma.
+     * Solo los coleccionistas pueden ser seleccionados como moderadores.
+     *
+     * @param identificacionColeccionista Identificación del coleccionista a seleccionar.
+     * @return Mensaje de éxito o error.
+     */
+    public String seleccionarColeccionistaComoModerador(String identificacionColeccionista) {
+        Usuario usuarioEncontrado = buscarUsuarioPorIdentificacion(identificacionColeccionista);
+        if (usuarioEncontrado == null) {
+            return "Error: No se encontró ningún usuario con esa identificación.";
+        }
+        if (!(usuarioEncontrado instanceof Coleccionista)) {
+            return "Error: Solo los coleccionistas pueden ser seleccionados como moderadores.";
+        }
+        Coleccionista coleccionistaSeleccionado = (Coleccionista) usuarioEncontrado;
+        if (coleccionistaSeleccionado.isEsModerador()) {
+            return "Error: Este coleccionista ya tiene el rol de moderador.";
+        }
+        coleccionistaSeleccionado.setEsModerador(true);
+        return "El coleccionista " + coleccionistaSeleccionado.getNombreCompleto()
+                + " ha sido seleccionado como moderador exitosamente.";
+    }
+
+// ===================== GESTIÓN DE SUBASTAS AVANZADA =====================
+
+    /**
+     * Cierra una subasta activa marcándola como vencida.
+     * Una subasta cerrada ya no acepta nuevas ofertas.
+     *
+     * @param indiceSubasta Índice base 1 de la subasta a cerrar.
+     * @return Mensaje con el resultado del cierre.
+     */
+    public String cerrarSubasta(int indiceSubasta) {
+        int indiceBase0 = indiceSubasta - 1;
+        if (indiceBase0 < 0 || indiceBase0 >= listaDeSubastas.size()) {
+            return "Error: El número de subasta ingresado no es válido.";
+        }
+        Subasta subastaSeleccionada = listaDeSubastas.get(indiceBase0);
+        if (!subastaSeleccionada.getEstadoActual().equals(Subasta.ESTADO_ACTIVA)) {
+            return "Error: Solo se pueden cerrar subastas activas. Estado actual: "
+                    + subastaSeleccionada.getEstadoActual();
+        }
+        subastaSeleccionada.setEstadoActual(Subasta.ESTADO_VENCIDA);
+        return "Subasta cerrada exitosamente.";
+    }
+
+    /**
+     * Retorna las subastas en las que el usuario tiene participación.
+     * Si es creador muestra las subastas que creó.
+     * Si es coleccionista también muestra las subastas donde realizó ofertas.
+     *
+     * @param identificacionUsuario Identificación del usuario a consultar.
+     * @return Lista de cadenas con las subastas del usuario.
+     */
+    public ArrayList<String> getSubastasPorUsuario(String identificacionUsuario) {
+        ArrayList<String> subastasDelUsuario = new ArrayList<>();
+        Usuario usuarioEncontrado = buscarUsuarioPorIdentificacion(identificacionUsuario);
+        if (usuarioEncontrado == null) {
+            subastasDelUsuario.add("Error: No se encontró el usuario con esa identificación.");
+            return subastasDelUsuario;
+        }
+        int contadorSubastas = 0;
+        for (int i = 0; i < listaDeSubastas.size(); i++) {
+            Subasta subasta = listaDeSubastas.get(i);
+            boolean esCreador = subasta.getCreadorDeLaSubasta()
+                    .getNumeroIdentificacion()
+                    .equals(identificacionUsuario);
+
+            boolean participoComoOferente = false;
+            for (Oferta oferta : subasta.getOfertasRecibidas()) {
+                if (oferta.getColeccionistaOferente() != null &&
+                        oferta.getColeccionistaOferente()
+                                .getNumeroIdentificacion()
+                                .equals(identificacionUsuario)) {
+                    participoComoOferente = true;
+                    break;
+                }
+            }
+            if (esCreador || participoComoOferente) {
+                String rolEnSubasta = esCreador ? "Creador" : "Participante";
+                subastasDelUsuario.add("Subasta #" + (i + 1)
+                        + " [" + rolEnSubasta + "]: "
+                        + subasta.toString());
+                contadorSubastas++;
+            }
+        }
+        if (contadorSubastas == 0) {
+            subastasDelUsuario.add("No tiene subastas registradas en la plataforma.");
+        }
+        return subastasDelUsuario;
+    }
+
+    /**
+     * Verifica si un vendedor existe en el sistema por su correo electrónico.
+     * Se usa en el flujo especial de creación de subasta para vendedores.
+     *
+     * @param correoElectronico Correo electrónico del vendedor a buscar.
+     * @return El Vendedor encontrado, o null si no existe.
+     */
+    public Vendedor buscarVendedorPorCorreo(String correoElectronico) {
+        for (Usuario usuario : listaDeUsuarios) {
+            if (usuario instanceof Vendedor &&
+                    usuario.getCorreoElectronico().equals(correoElectronico)) {
+                return (Vendedor) usuario;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Registra un vendedor rápido con datos mínimos para crear una subasta.
+     * Se usa cuando el vendedor no existe y decide crear una cuenta básica.
+     *
+     * @param nombreCompleto      Nombre completo del vendedor.
+     * @param correoElectronico   Correo electrónico del vendedor.
+     * @param direccionResidencia Dirección del vendedor.
+     * @return Mensaje de éxito o error.
+     */
+    public String registrarVendedorRapido(String nombreCompleto, String correoElectronico,
+                                          String direccionResidencia) {
+        for (Usuario usuario : listaDeUsuarios) {
+            if (usuario.getCorreoElectronico().equals(correoElectronico)) {
+                return "Error: Ya existe un usuario con ese correo electrónico.";
+            }
+        }
+        Vendedor nuevoVendedorRapido = new Vendedor(
+                nombreCompleto, correoElectronico,
+                LocalDate.of(1990, 1, 1), "temporal123",
+                correoElectronico, 0.0, direccionResidencia);
+        listaDeUsuarios.add(nuevoVendedorRapido);
+        return "Vendedor registrado exitosamente. Bienvenido, " + nombreCompleto + "!";
+    }
+
     //Métodos privados
     /**
      * Busca un usuario en la lista maestra por su número de identificación
@@ -520,8 +753,530 @@ public class Service {
         return "Error: Correo o contraseña incorrectos.";
     }
 
-    //Getters y Setters
+    //Autenticación con retorno de usuario
 
+    /**
+     * Autentica un usuario y retorna el objeto Usuario si las credenciales son correctas.
+     * A diferencia de iniciarSesion(), este método retorna el objeto para gestionar la sesión.
+     *
+     * @param correoElectronico Correo electrónico ingresado.
+     * @param contrasena        Contraseña ingresada.
+     * @return El Usuario autenticado, o null si las credenciales son incorrectas.
+     */
+    public Usuario autenticarUsuario(String correoElectronico, String contrasena) {
+        for (Usuario usuario : listaDeUsuarios) {
+            if (usuario.getCorreoElectronico().equals(correoElectronico)
+                    && usuario.getContrasena().equals(contrasena)
+                    && usuario.isActivo()) {
+                return usuario;
+            }
+        }
+        return null;
+    }
+
+//Modificación de usuarios
+
+    /**
+     * Modifica los datos básicos de un usuario registrado en la plataforma.
+     * Solo se pueden modificar nombre, correo y dirección (si aplica).
+     *
+     * @param numeroIdentificacion  Identificación del usuario a modificar.
+     * @param nuevoNombreCompleto   Nuevo nombre completo del usuario.
+     * @param nuevoCorreo           Nuevo correo electrónico.
+     * @param nuevaDireccion        Nueva dirección (solo para vendedor y coleccionista).
+     * @return Mensaje de éxito o error.
+     */
+    public String modificarUsuario(String numeroIdentificacion, String nuevoNombreCompleto,
+                                   String nuevoCorreo, String nuevaDireccion) {
+        Usuario usuarioEncontrado = buscarUsuarioPorIdentificacion(numeroIdentificacion);
+        if (usuarioEncontrado == null) {
+            return "Error: No se encontró el usuario con esa identificación.";
+        }
+        usuarioEncontrado.setNombreCompleto(nuevoNombreCompleto);
+        usuarioEncontrado.setCorreoElectronico(nuevoCorreo);
+        if (usuarioEncontrado instanceof Vendedor) {
+            Vendedor vendedorEncontrado = (Vendedor) usuarioEncontrado;
+            vendedorEncontrado.setDireccionResidencia(nuevaDireccion);
+        } else if (usuarioEncontrado instanceof Coleccionista) {
+            Coleccionista coleccionistaEncontrado = (Coleccionista) usuarioEncontrado;
+            coleccionistaEncontrado.setDireccionResidencia(nuevaDireccion);
+        }
+        return "Usuario modificado exitosamente.";
+    }
+
+//Activación e inactivación de usuarios
+
+    /**
+     * Cambia el estado activo/inactivo de un usuario.
+     * Si estaba activo lo inactiva, y si estaba inactivo lo activa.
+     *
+     * @param numeroIdentificacion Identificación del usuario a activar o inactivar.
+     * @return Mensaje indicando el nuevo estado del usuario.
+     */
+    public String activarInactivarUsuario(String numeroIdentificacion) {
+        Usuario usuarioEncontrado = buscarUsuarioPorIdentificacion(numeroIdentificacion);
+        if (usuarioEncontrado == null) {
+            return "Error: No se encontró el usuario con esa identificación.";
+        }
+        if (usuarioEncontrado instanceof Moderador) {
+            return "Error: No se puede inactivar al moderador de la plataforma.";
+        }
+        usuarioEncontrado.setActivo(!usuarioEncontrado.isActivo());
+        String nuevoEstado = usuarioEncontrado.isActivo() ? "activado" : "inactivado";
+        return "Usuario " + usuarioEncontrado.getNombreCompleto() + " " + nuevoEstado + " exitosamente.";
+    }
+
+//Adjudicación de subastas
+    /**
+     * Adjudica una subasta al coleccionista con la oferta más alta.
+     * Cambia el estado de la subasta a ADJUDICADA.
+     *
+     * @param indiceSubasta Índice base 1 de la subasta a adjudicar.
+     * @return Mensaje con el resultado de la adjudicación.
+     */
+    public String adjudicarSubasta(int indiceSubasta) {
+        int indiceBase0 = indiceSubasta - 1;
+        if (indiceBase0 < 0 || indiceBase0 >= listaDeSubastas.size()) {
+            return "Error: El número de subasta ingresado no es válido.";
+        }
+        Subasta subastaSeleccionada = listaDeSubastas.get(indiceBase0);
+        if (subastaSeleccionada.getOfertasRecibidas().isEmpty()) {
+            return "Error: La subasta no tiene ofertas para adjudicar.";
+        }
+        Oferta ofertaGanadora = subastaSeleccionada.getOfertaMasAlta();
+        subastaSeleccionada.setEstadoActual(Subasta.ESTADO_ADJUDICADA);
+
+        // Generar la orden de adjudicación
+        OrdenAdjudicacion nuevaOrden = new OrdenAdjudicacion(
+                ofertaGanadora.getNombreDelOferente(),
+                LocalDate.now(),
+                subastaSeleccionada.getObjetosSubastados(),
+                ofertaGanadora.getPrecioOfertado());
+        listaDeOrdenes.add(nuevaOrden);
+
+        return "Subasta adjudicada a " + ofertaGanadora.getNombreDelOferente()
+                + " por ¢" + String.format("%.2f", ofertaGanadora.getPrecioOfertado()) + ".";
+    }
+
+    /**
+     * Retorna el listado de órdenes de adjudicación formateado para su visualización.
+     *
+     * @return Lista de cadenas con la información de cada orden.
+     */
+    public ArrayList<String> getListaOrdenesFormateada() {
+        ArrayList<String> ordenesFormateadas = new ArrayList<>();
+        for (int i = 0; i < listaDeOrdenes.size(); i++) {
+            ordenesFormateadas.add("Orden #" + (i + 1) + ": " + listaDeOrdenes.get(i).toString());
+        }
+        return ordenesFormateadas;
+    }
+
+    /**
+     * Lee el archivo de configuración de la aplicación al iniciar el sistema.
+     * La información de configuración debe estar en el archivo config.txt
+     * ubicado en la raíz del proyecto.
+     * Si el archivo no existe o no se puede leer, el sistema continúa
+     * con valores por defecto.
+     */
+    private void leerArchivoConfiguracion() {
+        try (BufferedReader lectorArchivo = new BufferedReader(
+                new FileReader("config.txt"))) {
+            String lineaActual;
+            System.out.println("=== Configuración del sistema ===");
+            while ((lineaActual = lectorArchivo.readLine()) != null) {
+                // Ignorar líneas vacías o comentarios que empiezan con #
+                if (!lineaActual.trim().isEmpty() && !lineaActual.startsWith("#")) {
+                    System.out.println(lineaActual);
+                }
+            }
+            System.out.println("=================================");
+        } catch (IOException errorLectura) {
+            System.out.println("Advertencia: No se encontró el archivo config.txt. " +
+                    "El sistema continuará con valores por defecto.");
+        }
+    }
+
+    /**
+     * Selecciona aleatoriamente un coleccionista con rol de moderador
+     * de la lista de usuarios registrados.
+     *
+     * @return Un Coleccionista moderador aleatorio, o null si no hay ninguno.
+     */
+    private Coleccionista seleccionarModeradorAleatorio() {
+        ArrayList<Coleccionista> moderadoresDisponibles = new ArrayList<>();
+        for (Usuario usuario : listaDeUsuarios) {
+            if (usuario instanceof Coleccionista) {
+                Coleccionista coleccionistaModerador = (Coleccionista) usuario;
+                if (coleccionistaModerador.isEsModerador()) {
+                    moderadoresDisponibles.add(coleccionistaModerador);
+                }
+            }
+        }
+        if (moderadoresDisponibles.isEmpty()) {
+            return null;
+        }
+        int indiceAleatorio = (int) (Math.random() * moderadoresDisponibles.size());
+        return moderadoresDisponibles.get(indiceAleatorio);
+    }
+
+
+
+    /**
+     * Busca una categoría en la lista por su nombre, ignorando mayúsculas.
+     *
+     * @param nombreCategoria Nombre de la categoría a buscar.
+     * @return La categoría encontrada, o null si no existe.
+     */
+    private Categoria buscarCategoriaPorNombre(String nombreCategoria) {
+        for (Categoria categoria : listaDeCategorias) {
+            if (categoria.getNombreCategoria().equalsIgnoreCase(nombreCategoria)) {
+                return categoria;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Retorna el listado de subastas con información detallada para cada una.
+     * Incluye estado, cantidad de ofertas y oferta más alta.
+     *
+     * @return Lista de cadenas con la información detallada de cada subasta.
+     */
+    public ArrayList<String> getListaSubastasDetallada() {
+        ArrayList<String> subastasDetalladas = new ArrayList<>();
+        for (int i = 0; i < listaDeSubastas.size(); i++) {
+            Subasta subasta = listaDeSubastas.get(i);
+            Oferta ofertaMasAlta = subasta.getOfertaMasAlta();
+            String textoOfertaMasAlta = ofertaMasAlta != null
+                    ? "¢" + String.format("%.2f", ofertaMasAlta.getPrecioOfertado())
+                    + " por " + ofertaMasAlta.getNombreDelOferente()
+                    : "Sin ofertas";
+
+            String lineaSubasta = "Subasta #" + (i + 1) + "\n"
+                    + "  Creador: " + subasta.getCreadorDeLaSubasta().getNombreCompleto()
+                    + " | Puntuación: " + subasta.getPuntuacionDelCreador() + "\n"
+                    + "  Estado: " + subasta.getEstadoActual()
+                    + " | Precio mínimo: ¢" + String.format("%.2f",
+                    subasta.getPrecioMinimoDeAceptacion()) + "\n"
+                    + "  Tiempo restante: " + subasta.getTiempoRestanteFormateado() + "\n"
+                    + "  Ofertas recibidas: " + subasta.getOfertasRecibidas().size()
+                    + " | Oferta más alta: " + textoOfertaMasAlta + "\n"
+                    + "  Categoría: " + (subasta.getCategoriaSubasta() != null
+                    ? subasta.getCategoriaSubasta().getNombreCategoria()
+                    : "Sin categoría");
+
+            subastasDetalladas.add(lineaSubasta);
+        }
+        return subastasDetalladas;
+    }
+
+    /**
+     * Verifica si un vendedor existe en el sistema por su correo electrónico.
+     * Retorna un mensaje amigable indicando si ya tiene historial de ventas.
+     *
+     * @param correoElectronico Correo del vendedor a verificar.
+     * @return Mensaje indicando si existe o no en el sistema.
+     */
+    public String verificarExistenciaVendedor(String correoElectronico) {
+        Vendedor vendedorEncontrado = buscarVendedorPorCorreo(correoElectronico);
+        if (vendedorEncontrado != null) {
+            return "EXISTE: ¡Hola " + vendedorEncontrado.getNombreCompleto()
+                    + "! Vemos que ya has realizado ventas en nuestra plataforma. "
+                    + "¿Te gustaría crear una cuenta completa para disfrutar de "
+                    + "más beneficios?";
+        }
+        return "NO_EXISTE";
+    }
+
+    /**
+     * Permite al coleccionista ganador aceptar la adjudicación de una subasta.
+     * Solo el ganador de la subasta puede aceptar la adjudicación.
+     * Al aceptar se marca la orden como aceptada formalmente.
+     *
+     * @param indiceOrden           Índice base 1 de la orden a aceptar.
+     * @param identificacionGanador Identificación del coleccionista que acepta.
+     * @return Mensaje de éxito o error.
+     */
+    public String aceptarAdjudicacion(int indiceOrden, String identificacionGanador) {
+        int indiceBase0 = indiceOrden - 1;
+        if (indiceBase0 < 0 || indiceBase0 >= listaDeOrdenes.size()) {
+            return "Error: El número de orden ingresado no es válido.";
+        }
+        OrdenAdjudicacion ordenSeleccionada = listaDeOrdenes.get(indiceBase0);
+
+        if (ordenSeleccionada.isAceptada()) {
+            return "Error: Esta adjudicación ya fue aceptada anteriormente.";
+        }
+
+        // Verificar que quien acepta es realmente el ganador
+        Usuario usuarioEncontrado = buscarUsuarioPorIdentificacion(identificacionGanador);
+        if (usuarioEncontrado == null) {
+            return "Error: No se encontró el usuario con esa identificación.";
+        }
+        if (!ordenSeleccionada.getNombreCompletoDelGanador()
+                .equals(usuarioEncontrado.getNombreCompleto())) {
+            return "Error: Solo el ganador de la subasta puede aceptar la adjudicación.";
+        }
+
+        ordenSeleccionada.setAceptada(true);
+        return "¡Adjudicación aceptada exitosamente! "
+                + "Se ha generado su orden de compra por ¢"
+                + String.format("%.2f", ordenSeleccionada.getPrecioTotalDeLaOrden()) + ".";
+    }
+
+    /**
+     * Retorna las órdenes de adjudicación pendientes de aceptación.
+     *
+     * @return Lista de cadenas con las órdenes pendientes.
+     */
+    public ArrayList<String> getOrdenesPendientesDeAceptacion() {
+        ArrayList<String> ordenesPendientes = new ArrayList<>();
+        for (int i = 0; i < listaDeOrdenes.size(); i++) {
+            OrdenAdjudicacion orden = listaDeOrdenes.get(i);
+            if (!orden.isAceptada()) {
+                ordenesPendientes.add("Orden #" + (i + 1) + ": "
+                        + orden.toString()
+                        + " | Estado: PENDIENTE DE ACEPTACIÓN");
+            }
+        }
+        if (ordenesPendientes.isEmpty()) {
+            ordenesPendientes.add("No hay órdenes pendientes de aceptación.");
+        }
+        return ordenesPendientes;
+    }
+
+    /**
+     * Marca una orden como entregada.
+     * Solo el ganador puede marcar la orden como entregada.
+     * Al marcar como entregada se habilita la calificación mutua.
+     *
+     * @param indiceOrden           Índice base 1 de la orden.
+     * @param identificacionGanador Identificación del ganador que marca la entrega.
+     * @return Mensaje de éxito o error.
+     */
+    public String marcarOrdenComoEntregada(int indiceOrden,
+                                           String identificacionGanador) {
+        int indiceBase0 = indiceOrden - 1;
+        if (indiceBase0 < 0 || indiceBase0 >= listaDeOrdenes.size()) {
+            return "Error: El número de orden ingresado no es válido.";
+        }
+        OrdenAdjudicacion ordenSeleccionada = listaDeOrdenes.get(indiceBase0);
+
+        if (!ordenSeleccionada.isAceptada()) {
+            return "Error: La orden debe ser aceptada antes de marcarla como entregada.";
+        }
+        if (ordenSeleccionada.isEntregada()) {
+            return "Error: Esta orden ya fue marcada como entregada.";
+        }
+
+        // Verificar que quien marca la entrega es el ganador
+        Usuario usuarioEncontrado = buscarUsuarioPorIdentificacion(identificacionGanador);
+        if (usuarioEncontrado == null) {
+            return "Error: No se encontró el usuario con esa identificación.";
+        }
+        if (!ordenSeleccionada.getNombreCompletoDelGanador()
+                .equals(usuarioEncontrado.getNombreCompleto())) {
+            return "Error: Solo el ganador puede marcar la orden como entregada.";
+        }
+
+        ordenSeleccionada.setEntregada(true);
+        return "Orden marcada como entregada. ¡Ya podés calificar al vendedor!";
+    }
+
+    /**
+     * Registra la calificación del ganador al vendedor de una orden entregada.
+     * La escala es del 1 al 5 donde 1 es lo más bajo y 5 lo más alto.
+     *
+     * @param indiceOrden           Índice base 1 de la orden.
+     * @param identificacionGanador Identificación del ganador que califica.
+     * @param calificacion          Valor del 1 al 5.
+     * @return Mensaje de éxito o error.
+     */
+    public String calificarVendedor(int indiceOrden, String identificacionGanador,
+                                    int calificacion) {
+        if (calificacion < 1 || calificacion > 5) {
+            return "Error: La calificación debe ser entre 1 y 5.";
+        }
+        int indiceBase0 = indiceOrden - 1;
+        if (indiceBase0 < 0 || indiceBase0 >= listaDeOrdenes.size()) {
+            return "Error: El número de orden ingresado no es válido.";
+        }
+        OrdenAdjudicacion ordenSeleccionada = listaDeOrdenes.get(indiceBase0);
+
+        if (!ordenSeleccionada.isEntregada()) {
+            return "Error: Solo se puede calificar después de marcar la orden como entregada.";
+        }
+        if (ordenSeleccionada.getCalificacionDelGanadorAlVendedor() > 0) {
+            return "Error: Ya calificaste al vendedor de esta orden.";
+        }
+
+        // Verificar que quien califica es el ganador
+        Usuario usuarioEncontrado = buscarUsuarioPorIdentificacion(identificacionGanador);
+        if (usuarioEncontrado == null) {
+            return "Error: No se encontró el usuario con esa identificación.";
+        }
+        if (!ordenSeleccionada.getNombreCompletoDelGanador()
+                .equals(usuarioEncontrado.getNombreCompleto())) {
+            return "Error: Solo el ganador puede calificar al vendedor.";
+        }
+
+        ordenSeleccionada.setCalificacionDelGanadorAlVendedor(calificacion);
+
+        // Actualizar puntuación del creador de la subasta correspondiente
+        actualizarPuntuacionUsuario(ordenSeleccionada, calificacion, false);
+
+        return "Calificación de " + calificacion + "/5 registrada al vendedor exitosamente.";
+    }
+
+    /**
+     * Registra la calificación del vendedor al ganador de una orden entregada.
+     * La escala es del 1 al 5 donde 1 es lo más bajo y 5 lo más alto.
+     *
+     * @param indiceOrden             Índice base 1 de la orden.
+     * @param identificacionVendedor  Identificación del vendedor que califica.
+     * @param calificacion            Valor del 1 al 5.
+     * @return Mensaje de éxito o error.
+     */
+    public String calificarGanador(int indiceOrden, String identificacionVendedor,
+                                   int calificacion) {
+        if (calificacion < 1 || calificacion > 5) {
+            return "Error: La calificación debe ser entre 1 y 5.";
+        }
+        int indiceBase0 = indiceOrden - 1;
+        if (indiceBase0 < 0 || indiceBase0 >= listaDeOrdenes.size()) {
+            return "Error: El número de orden ingresado no es válido.";
+        }
+        OrdenAdjudicacion ordenSeleccionada = listaDeOrdenes.get(indiceBase0);
+
+        if (!ordenSeleccionada.isEntregada()) {
+            return "Error: Solo se puede calificar después de marcar la orden como entregada.";
+        }
+        if (ordenSeleccionada.getCalificacionDelVendedorAlGanador() > 0) {
+            return "Error: Ya calificaste al ganador de esta orden.";
+        }
+
+        ordenSeleccionada.setCalificacionDelVendedorAlGanador(calificacion);
+
+        // Actualizar puntuación del ganador
+        actualizarPuntuacionUsuario(ordenSeleccionada, calificacion, true);
+
+        return "Calificación de " + calificacion + "/5 registrada al ganador exitosamente.";
+    }
+
+    /**
+     * Actualiza la puntuación de reputación del usuario calificado.
+     * Promedia la nueva calificación con la puntuación actual.
+     *
+     * @param orden        Orden de adjudicación relacionada.
+     * @param calificacion Nueva calificación recibida.
+     * @param esGanador    true si se actualiza al ganador, false si es al vendedor.
+     */
+    private void actualizarPuntuacionUsuario(OrdenAdjudicacion orden,
+                                             int calificacion, boolean esGanador) {
+        for (Usuario usuario : listaDeUsuarios) {
+            boolean coincide = esGanador
+                    ? usuario.getNombreCompleto().equals(orden.getNombreCompletoDelGanador())
+                    : false;
+
+            if (!esGanador) {
+                // Buscar el creador de la subasta correspondiente a la orden
+                for (Subasta subasta : listaDeSubastas) {
+                    if (subasta.getObjetosSubastados()
+                            .equals(orden.getObjetosAdjudicados())) {
+                        coincide = subasta.getCreadorDeLaSubasta()
+                                .getNumeroIdentificacion()
+                                .equals(usuario.getNumeroIdentificacion());
+                        break;
+                    }
+                }
+            }
+
+            if (coincide) {
+                if (usuario instanceof Vendedor) {
+                    Vendedor vendedor = (Vendedor) usuario;
+                    double nuevaPuntuacion = vendedor.getPuntuacionReputacion() == 0
+                            ? calificacion
+                            : (vendedor.getPuntuacionReputacion() + calificacion) / 2.0;
+                    vendedor.setPuntuacionReputacion(nuevaPuntuacion);
+                } else if (usuario instanceof Coleccionista) {
+                    Coleccionista coleccionista = (Coleccionista) usuario;
+                    double nuevaPuntuacion = coleccionista.getPuntuacionReputacion() == 0
+                            ? calificacion
+                            : (coleccionista.getPuntuacionReputacion() + calificacion) / 2.0;
+                    coleccionista.setPuntuacionReputacion(nuevaPuntuacion);
+                }
+                break;
+            }
+        }
+    }
+
+    /**
+     * Retorna las órdenes entregadas disponibles para calificar.
+     *
+     * @return Lista de cadenas con las órdenes entregadas.
+     */
+    public ArrayList<String> getOrdenesEntregadasFormateadas() {
+        ArrayList<String> ordenesEntregadas = new ArrayList<>();
+        for (int i = 0; i < listaDeOrdenes.size(); i++) {
+            OrdenAdjudicacion orden = listaDeOrdenes.get(i);
+            if (orden.isEntregada()) {
+                String calGanador = orden.getCalificacionDelGanadorAlVendedor() > 0
+                        ? String.valueOf(orden.getCalificacionDelGanadorAlVendedor())
+                        : "Pendiente";
+                String calVendedor = orden.getCalificacionDelVendedorAlGanador() > 0
+                        ? String.valueOf(orden.getCalificacionDelVendedorAlGanador())
+                        : "Pendiente";
+                ordenesEntregadas.add("Orden #" + (i + 1)
+                        + " | Ganador: " + orden.getNombreCompletoDelGanador()
+                        + " | Cal. del ganador al vendedor: " + calGanador
+                        + " | Cal. del vendedor al ganador: " + calVendedor);
+            }
+        }
+        if (ordenesEntregadas.isEmpty()) {
+            ordenesEntregadas.add("No hay órdenes entregadas para calificar.");
+        }
+        return ordenesEntregadas;
+    }
+
+    /**
+     * Simula el envío de un correo electrónico al moderador asignado a una subasta.
+     * En un ambiente de producción este método se conectaría a un servidor SMTP
+     * usando las credenciales del archivo config.txt para enviar el correo real.
+     * Por ahora imprime el mensaje en consola y retorna confirmación visual.
+     *
+     * @param moderadorAsignado  Coleccionista moderador que recibirá el correo.
+     * @param nombreCreador      Nombre del usuario que creó la subasta.
+     * @return Mensaje confirmando la simulación del envío.
+     */
+    private String simularEnvioCorreoModerador(Coleccionista moderadorAsignado,
+                                               String nombreCreador) {
+        String destinatario  = moderadorAsignado.getCorreoElectronico();
+        String nombreModerador = moderadorAsignado.getNombreCompleto();
+
+        // Simular el contenido del correo que se enviaría
+        String contenidoCorreo = "\n"
+                + "========================================\n"
+                + "CORREO SIMULADO — Plataforma de Subastas\n"
+                + "========================================\n"
+                + "Para: " + destinatario + "\n"
+                + "Asunto: Fuiste seleccionado como moderador\n"
+                + "----------------------------------------\n"
+                + "Estimado/a " + nombreModerador + ",\n\n"
+                + "Has sido seleccionado/a aleatoriamente para moderar\n"
+                + "la subasta creada por: " + nombreCreador + ".\n\n"
+                + "Por favor revisá la plataforma para ver los detalles.\n\n"
+                + "Saludos,\n"
+                + "Plataforma Digital de Subastas Especializadas\n"
+                + "========================================";
+
+        // Imprimir en consola simulando el envío
+        System.out.println(contenidoCorreo);
+
+        return "Correo enviado a " + destinatario + ".";
+    }
+
+
+    //Getters y Setters
     /**
      * Obtiene la lista completa de usuarios registrados
      *
@@ -576,5 +1331,22 @@ public class Service {
         this.listaDeOrdenes = listaDeOrdenes;
     }
 
+    /**
+     * Obtiene la lista completa de categorías registradas.
+     *
+     * @return Lista de todas las categorías.
+     */
+    public ArrayList<Categoria> getListaDeCategorias() {
+        return listaDeCategorias;
+    }
+
+    /**
+     * Establece la lista de categorías.
+     *
+     * @param listaDeCategorias Nueva lista de categorías.
+     */
+    public void setListaDeCategorias(ArrayList<Categoria> listaDeCategorias) {
+        this.listaDeCategorias = listaDeCategorias;
+    }
 
 }

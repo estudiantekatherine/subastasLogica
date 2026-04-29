@@ -40,6 +40,18 @@ public class Subasta {
     /** Lista de todas las ofertas recibidas durante el período activo de la subasta */
     private ArrayList<Oferta> ofertasRecibidas;
 
+    /**
+     * Coleccionista seleccionado aleatoriamente para moderar esta subasta.
+     * Se asigna automáticamente al momento de crear la subasta.
+     */
+    private Coleccionista moderadorAsignado;
+
+    /**
+     * Categoría temática a la que pertenece esta subasta.
+     * Permite organizar y filtrar las subastas por tipo de objeto.
+     */
+    private Categoria categoriaSubasta;
+
     //Constructores
     /**
      * Constructor por defecto.
@@ -57,13 +69,16 @@ public class Subasta {
      */
     public Subasta(LocalDateTime fechaDeVencimiento, Usuario creadorDeLaSubasta,
                    double precioMinimoDeAceptacion,
-                   ArrayList<ObjetoColeccionable> objetosSubastados) {
+                   ArrayList<ObjetoColeccionable> objetosSubastados,
+                   Categoria categoriaSubasta) {
         this.fechaDeVencimiento       = fechaDeVencimiento;
         this.creadorDeLaSubasta       = creadorDeLaSubasta;
         this.precioMinimoDeAceptacion = precioMinimoDeAceptacion;
         this.objetosSubastados        = (objetosSubastados != null) ? objetosSubastados : new ArrayList<>();
         this.estadoActual             = ESTADO_ACTIVA;
         this.ofertasRecibidas         = new ArrayList<>();
+        this.moderadorAsignado        = null;
+        this.categoriaSubasta         = categoriaSubasta;
     }
 
     //Métodos
@@ -196,6 +211,42 @@ public class Subasta {
     public void setOfertasRecibidas(ArrayList<Oferta> ofertasRecibidas) {
         this.ofertasRecibidas = ofertasRecibidas; }
 
+    /**
+     * Obtiene el coleccionista asignado como moderador de esta subasta.
+     *
+     * @return Coleccionista moderador, o null si no se ha asignado uno.
+     */
+    public Coleccionista getModeradorAsignado() {
+        return moderadorAsignado;
+    }
+
+    /**
+     * Establece el coleccionista que moderará esta subasta.
+     *
+     * @param moderadorAsignado Coleccionista seleccionado como moderador.
+     */
+    public void setModeradorAsignado(Coleccionista moderadorAsignado) {
+        this.moderadorAsignado = moderadorAsignado;
+    }
+
+    /**
+     * Obtiene la categoría de esta subasta.
+     *
+     * @return Categoría de la subasta.
+     */
+    public Categoria getCategoriaSubasta() {
+        return categoriaSubasta;
+    }
+
+    /**
+     * Establece la categoría de esta subasta.
+     *
+     * @param categoriaSubasta Nueva categoría de la subasta.
+     */
+    public void setCategoriaSubasta(Categoria categoriaSubasta) {
+        this.categoriaSubasta = categoriaSubasta;
+    }
+
     //ToString
     /**
      * Retorna una representación textual completa de la subasta
@@ -215,6 +266,8 @@ public class Subasta {
              + ", estado='"        + estadoActual                                   + '\''
              + ", objetos="        + objetosSubastados.size()
              + ", ofertas="        + ofertasRecibidas.size()
+                + ", categoria="   + (categoriaSubasta  != null ? categoriaSubasta.getNombreCategoria()  : "Sin categoría")
+                + ", moderador="   + (moderadorAsignado != null ? moderadorAsignado.getNombreCompleto()  : "Sin moderador")
              + '}';
     }
 

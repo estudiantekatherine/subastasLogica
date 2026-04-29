@@ -34,6 +34,9 @@ public class Coleccionista extends Usuario {
      */
     private ArrayList<ObjetoColeccionable> coleccionDeObjetos;
 
+    /** Indica si el coleccionista tiene el rol de moderador de la plataforma*/
+    private boolean esModerador;
+
     //Constructores
 
     /**
@@ -66,6 +69,7 @@ public class Coleccionista extends Usuario {
         this.direccionResidencia = direccionResidencia;
         this.listaDeIntereses = (listaDeIntereses != null) ? listaDeIntereses : new ArrayList<>();
         this.coleccionDeObjetos = (coleccionDeObjetos != null) ? coleccionDeObjetos : new ArrayList<>();
+        this.esModerador = false;
     }
 
     //Métodos
@@ -160,6 +164,24 @@ public class Coleccionista extends Usuario {
         this.coleccionDeObjetos = coleccionDeObjetos;
     }
 
+    /**
+     * Indica si el coleccionista tiene el rol de moderador asignado.
+     *
+     * @return true si es moderador, false en caso contrario.
+     */
+    public boolean isEsModerador() {
+        return esModerador;
+    }
+
+    /**
+     * Establece si el coleccionista tiene el rol de moderador.
+     *
+     * @param esModerador true para asignarlo como moderador, false para quitarle el rol.
+     */
+    public void setEsModerador(boolean esModerador) {
+        this.esModerador = esModerador;
+    }
+
     //To String
     /**
      * Retorna una representación textual completa del coleccionista,
@@ -175,6 +197,7 @@ public class Coleccionista extends Usuario {
              + ", direccion='" + direccionResidencia + '\''
              + ", intereses=" + listaDeIntereses
              + ", cantidadObjetos=" + coleccionDeObjetos.size()
+                + ", esModerador=" + esModerador
              + "}";
     }
 //Inclusión de metodo equals
@@ -190,5 +213,6 @@ public class Coleccionista extends Usuario {
         if (objeto == null) return false;
         if (!(objeto instanceof Coleccionista)) return false; //coleccionista solo igual a coleccionista
         return super.equals(objeto);
+
     }
 }

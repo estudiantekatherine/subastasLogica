@@ -28,6 +28,18 @@ public class OrdenAdjudicacion {
      */
     private double precioTotalDeLaOrden;
 
+    /** Indica si el ganador aceptó formalmente la adjudicación. */
+    private boolean aceptada;
+
+    /** Calificación que el ganador le dio al vendedor/creador (escala 1-5). */
+    private int calificacionDelGanadorAlVendedor;
+
+    /** Calificación que el vendedor/creador le dio al ganador (escala 1-5). */
+    private int calificacionDelVendedorAlGanador;
+
+    /** Indica si la orden fue marcada como entregada por el ganador. */
+    private boolean entregada;
+
     //Constructores
     /**
      * Constructor por defecto.
@@ -50,6 +62,10 @@ public class OrdenAdjudicacion {
         this.fechaDeLaOrden = fechaDeLaOrden;
         this.objetosAdjudicados = (objetosAdjudicados != null) ? objetosAdjudicados : new ArrayList<>();
         this.precioTotalDeLaOrden = precioTotalDeLaOrden;
+        this.aceptada = false;
+        this.calificacionDelGanadorAlVendedor = 0;
+        this.calificacionDelVendedorAlGanador = 0;
+        this.entregada = false;
     }
 
     //Getters y Setters
@@ -125,6 +141,78 @@ public class OrdenAdjudicacion {
         this.precioTotalDeLaOrden = precioTotalDeLaOrden;
     }
 
+    /**
+     * Indica si el ganador aceptó la adjudicación.
+     *
+     * @return true si fue aceptada, false si está pendiente.
+     */
+    public boolean isAceptada() {
+        return aceptada;
+    }
+
+    /**
+     * Establece si el ganador aceptó la adjudicación.
+     *
+     * @param aceptada true para marcarla como aceptada.
+     */
+    public void setAceptada(boolean aceptada) {
+        this.aceptada = aceptada;
+    }
+
+    /**
+     * Obtiene la calificación que el ganador le dio al vendedor.
+     *
+     * @return Calificación del 1 al 5, o 0 si no ha calificado.
+     */
+    public int getCalificacionDelGanadorAlVendedor() {
+        return calificacionDelGanadorAlVendedor;
+    }
+
+    /**
+     * Establece la calificación del ganador al vendedor.
+     *
+     * @param calificacion Calificación del 1 al 5.
+     */
+    public void setCalificacionDelGanadorAlVendedor(int calificacion) {
+        this.calificacionDelGanadorAlVendedor = calificacion;
+    }
+
+    /**
+     * Obtiene la calificación que el vendedor le dio al ganador.
+     *
+     * @return Calificación del 1 al 5, o 0 si no ha calificado.
+     */
+    public int getCalificacionDelVendedorAlGanador() {
+        return calificacionDelVendedorAlGanador;
+    }
+
+    /**
+     * Establece la calificación del vendedor al ganador.
+     *
+     * @param calificacion Calificación del 1 al 5.
+     */
+    public void setCalificacionDelVendedorAlGanador(int calificacion) {
+        this.calificacionDelVendedorAlGanador = calificacion;
+    }
+
+    /**
+     * Indica si la orden fue marcada como entregada.
+     *
+     * @return true si fue entregada, false si está pendiente.
+     */
+    public boolean isEntregada() {
+        return entregada;
+    }
+
+    /**
+     * Establece si la orden fue entregada al ganador.
+     *
+     * @param entregada true para marcarla como entregada.
+     */
+    public void setEntregada(boolean entregada) {
+        this.entregada = entregada;
+    }
+
     //To String
     /**
      * Retorna una representación textual completa de la orden de adjudicación,
@@ -139,6 +227,10 @@ public class OrdenAdjudicacion {
              + ", fechaOrden=" + fechaDeLaOrden
              + ", cantidadObjetos=" + objetosAdjudicados.size()
              + ", precioTotal=¢" + String.format("%.2f", precioTotalDeLaOrden)
+                + ", aceptada=" + aceptada
+                + ", entregada=" + entregada
+                + ", calificacionGanadorAlVendedor=" + calificacionDelGanadorAlVendedor
+                + ", calificacionVendedorAlGanador=" + calificacionDelVendedorAlGanador
              + '}';
     }
 

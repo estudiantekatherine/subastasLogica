@@ -28,6 +28,9 @@ public abstract class Usuario {
     /** Dirección de correo electrónico del usuario, utilizada para comunicaciones */
     private String correoElectronico;
 
+    /** Indica si el usuario está activo en la plataforma */
+    private boolean activo;
+
     //Constructores
     /**
      * Constructor por defecto.
@@ -51,6 +54,7 @@ public abstract class Usuario {
         this.fechaNacimiento = fechaNacimiento;
         this.contrasena = contrasena;
         this.correoElectronico = correoElectronico;
+        this.activo = true;
     }
 
     //Métodos
@@ -164,6 +168,24 @@ public abstract class Usuario {
         this.correoElectronico = correoElectronico;
     }
 
+    /**
+     * Indica si el usuario está activo en la plataforma.
+     *
+     * @return true si está activo, false si está inactivo.
+     */
+    public boolean isActivo() {
+        return activo;
+    }
+
+    /**
+     * Establece el estado activo o inactivo del usuario.
+     *
+     * @param activo Nuevo estado del usuario.
+     */
+    public void setActivo(boolean activo) {
+        this.activo = activo;
+    }
+
     //To String
     /**
      * Retorna una representación textual con los datos comunes del usuario
@@ -175,7 +197,8 @@ public abstract class Usuario {
         return "nombre='" + nombreCompleto + '\''
              + ", id='" + numeroIdentificacion + '\''
              + ", edad=" + calcularEdad() + " año(s)"
-             + ", correo='" + correoElectronico + '\'';
+             + ", correo='" + correoElectronico + '\''
+                + ", activo = " + activo;
     }
 
     //Inclusión del metodo equals

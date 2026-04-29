@@ -1,5 +1,7 @@
 package cr.ac.ucenfotec.dominio;
 
+import java.time.LocalDate;
+
 /**
  * Representa una oferta económica presentada por un coleccionista sobre una subasta activa
  * Cada oferta registra el nombre y puntuación del oferente al momento de realizarla,
@@ -28,6 +30,9 @@ public class Oferta {
      */
     private Coleccionista coleccionistaOferente;
 
+    /** Fecha en que el coleccionista realizó la oferta. */
+    private LocalDate fechaDeOferta;
+
     //Constructores
 
     /**
@@ -48,6 +53,7 @@ public class Oferta {
         this.nombreDelOferente = coleccionistaOferente.getNombreCompleto();
         this.puntuacionDelOferente = coleccionistaOferente.getPuntuacionReputacion();
         this.precioOfertado = precioOfertado;
+        this.fechaDeOferta = LocalDate.now();
     }
 
     //Getters y Setters
@@ -123,6 +129,24 @@ public class Oferta {
         this.coleccionistaOferente = coleccionistaOferente;
     }
 
+    /**
+     * Obtiene la fecha en que se realizó la oferta.
+     *
+     * @return Fecha de la oferta.
+     */
+    public LocalDate getFechaDeOferta() {
+        return fechaDeOferta;
+    }
+
+    /**
+     * Establece la fecha de la oferta.
+     *
+     * @param fechaDeOferta Nueva fecha de la oferta.
+     */
+    public void setFechaDeOferta(LocalDate fechaDeOferta) {
+        this.fechaDeOferta = fechaDeOferta;
+    }
+
     //To String
 
     /**
@@ -137,6 +161,7 @@ public class Oferta {
              + "oferente='" + nombreDelOferente + '\''
              + ", puntuacion=" + puntuacionDelOferente
              + ", precioOfertado=$" + String.format("%.2f", precioOfertado)
+                + ", fechaOferta=" + fechaDeOferta
              + '}';
     }
 
